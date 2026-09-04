@@ -1,0 +1,68 @@
+"""
+Talks to the Claude API: sends the slide screenshot + what you've been saying + where your
+cursor is, and gets back a simple SVG diagram to show alongside your slide.
+"""
+import re
+import anthropic
+from config import ANTHROPIC_API_KEY, CLAUDE_MODEL
+
+client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+
+SYSTEM_PROMPT = """You are a teaching assistant that watches a lecture slide and helps visualize
+concepts for students in real time.
+
+You will be given:
+1. A screenshot of the current slide.
+2. What the teacher has been saying recently (a transcript snippet).
+3. Roughly where the teacher's mouse cursor was (an x,y pixel position) as a hint of what part
+   of the slide they're pointing at.
+
+Your job: produce ONE clear, simple SVG diagram that visually explains the concept the teacher
+is currently discussing. Use the transcript to figure out what to focus on, and the cursor
+position as a hint for which part of the slide matters most right now.
+
+Rules:
+- Respond with ONLY raw SVG code. No markdown fences, no explanation, no extra commentary.
+- Use viewBox="0 0 800 600" sizing.
+- Clean, high-contrast style: dark text on a white/light background, simple shapes, readable labels.
+- Prefer flowcharts, labeled diagrams, comparison boxes, or simple illustrations over decoration.
+- Keep text legible - font-size 16px or larger, don't overcrowd the canvas.
+"""
+
+
+def generate_visual(image_b64, media_type, transcript_snippet, cursor_pos):
+    user_text = (
+        f'Recent transcript of what I\'ve been saying: "{transcript_snippet}"\n'
+        f"My cursor was roughly at pixel position: {cursor_pos}\n\n"
+        f"Look at the attached slide screenshot and generate the SVG diagram now."
+    )
+
+    response = client.messages.create(
+        model=CLAUDE_MODEL,
+        max_tokens=2000,
+        system=SYSTEM_PROMPT,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": media_type,
+                            "data": image_b64,
+                        },
+                    },
+                    {"type": "text", "text": user_text},
+                ],
+            }
+        ],
+    )
+
+    raw = response.content[0].text.strip()
+
+    # Safety net: if Claude wraps the SVG in ```svg fences anyway, strip them out.
+    match = re.search(r"<svg.*</svg>", raw, re.DOTALL)
+    if match:
+        return match.group(0)
+    return raw
