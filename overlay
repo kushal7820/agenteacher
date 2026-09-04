@@ -1,0 +1,51 @@
+"""
+The small always-on-top window that shows the generated diagram next to your PPT.
+Uses pywebview so it can render real SVG/HTML (Tkinter can't render SVG directly).
+"""
+import webview
+from config import OVERLAY_WIDTH, OVERLAY_HEIGHT
+
+_window = None
+
+HTML_SHELL = """
+<html>
+<head>
+<style>
+  body { margin:0; padding:16px; background:#ffffff; font-family: -apple-system, Segoe UI, sans-serif; }
+  #status { color:#888; font-size:13px; margin-bottom:10px; }
+  #content { width:100%; }
+  #content svg { width:100%; height:auto; }
+</style>
+</head>
+<body>
+  <div id="status">Waiting for first visualization... (press F9 or say "visualize this")</div>
+  <div id="content"></div>
+</body>
+</html>
+"""
+
+
+def start_overlay():
+    """Call once, from the MAIN thread, at program startup - pywebview needs the main thread."""
+    global _window
+    _window = webview.create_window(
+        "Teaching Visualizer",
+        html=HTML_SHELL,
+        width=OVERLAY_WIDTH,
+        height=OVERLAY_HEIGHT,
+        on_top=True,
+        easy_drag=True,
+    )
+    webview.start()  # this blocks - runs the window's event loop
+
+
+def update_visual(svg_code, status_text="Updated"):
+    """Call this from any thread (hotkey thread, voice thread) to push a new diagram."""
+    if _window is None:
+        return
+    safe_svg = svg_code.replace("`", "\\`").replace("\n", " ").replace("\r", " ")
+    js = f"""
+    document.getElementById('content').innerHTML = `{safe_svg}`;
+    document.getElementById('status').innerText = `{status_text}`;
+    """
+    _window.evaluate_js(js)
