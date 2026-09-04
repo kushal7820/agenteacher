@@ -1,0 +1,56 @@
+"""
+Teaching Visualizer - main entry point.
+Run this file: python main.py
+
+While it's running:
+  - Press F9 anytime to visualize whatever's on your current slide.
+  - If voice mode is on, say something like "visualize this" while teaching and it triggers too.
+"""
+import keyboard  # global hotkey listener - works even if the window isn't focused
+
+from config import HOTKEY, ENABLE_VOICE
+from screen_capture import capture_full_screen_base64, get_cursor_position
+from vision_client import generate_visual
+from overlay import start_overlay, update_visual
+from voice_listener import start_voice_listener
+
+
+def run_visualization(transcript_snippet="(no recent speech captured)"):
+    print("📸 Capturing screen and generating visualization...")
+    try:
+        image_b64, media_type = capture_full_screen_base64()
+        cursor_pos = get_cursor_position()
+        svg_code = generate_visual(image_b64, media_type, transcript_snippet, cursor_pos)
+        update_visual(svg_code, status_text="Updated just now")
+        print("✅ Visualization updated.")
+    except Exception as e:
+        print(f"⚠️ Error generating visualization: {e}")
+        update_visual("<svg viewBox='0 0 800 600'></svg>", status_text=f"Error: {e}")
+
+
+def on_hotkey():
+    run_visualization()
+
+
+def on_voice_trigger(transcript_snippet):
+    run_visualization(transcript_snippet)
+
+
+def main():
+    print("Teaching Visualizer starting up.")
+    print(f"Press {HOTKEY.upper()} anytime to visualize the current slide.")
+
+    keyboard.add_hotkey(HOTKEY, on_hotkey)
+
+    if ENABLE_VOICE:
+        print('🎙️  Voice trigger enabled - say things like "visualize this" while teaching.')
+        start_voice_listener(on_voice_trigger)
+    else:
+        print("🎙️  Voice trigger disabled (ENABLE_VOICE=False in config.py) - hotkey only.")
+
+    # pywebview must run its event loop on the MAIN thread, so this call comes last and blocks.
+    start_overlay()
+
+
+if __name__ == "__main__":
+    main()
