@@ -1,0 +1,66 @@
+"""
+Runs in the background: continuously listens to your microphone, transcribes what you say
+in small chunks, keeps a rolling buffer of your recent speech, and calls a callback whenever
+it hears one of your trigger phrases (e.g. "visualize this").
+
+NOTE: This is a simple, readable reference version - it transcribes in fixed 4-second chunks
+rather than using a fancier streaming/VAD approach. That means there's a small delay (a few
+seconds) before a trigger phrase is caught. For a more responsive version later, look at the
+WhisperLive or Whispering repos linked in the README.
+"""
+import threading
+import time
+
+from config import WHISPER_MODEL_SIZE, TRIGGER_PHRASES, TRANSCRIPT_BUFFER_SECONDS
+
+SAMPLE_RATE = 16000
+CHUNK_SECONDS = 4
+
+
+def start_voice_listener(on_trigger_callback):
+    """
+    Starts the listener on a background thread and returns immediately.
+    on_trigger_callback(transcript_snippet: str) is called whenever a trigger phrase is heard.
+    """
+    from faster_whisper import WhisperModel
+    import sounddevice as sd
+
+    model = WhisperModel(WHISPER_MODEL_SIZE, device="cpu", compute_type="int8")
+
+    buffer_lock = threading.Lock()
+    rolling_transcript = []  # list of (timestamp, text)
+
+    def record_chunk():
+        audio = sd.rec(int(CHUNK_SECONDS * SAMPLE_RATE), samplerate=SAMPLE_RATE,
+                        channels=1, dtype="float32")
+        sd.wait()
+        return audio.flatten()
+
+    def loop():
+        print("🎙️ Voice listener running - speak naturally, it's transcribing in the background.")
+        while True:
+            audio_chunk = record_chunk()
+            segments, _ = model.transcribe(audio_chunk, language="en")
+            text = " ".join(seg.text for seg in segments).strip()
+            if not text:
+                continue
+
+            with buffer_lock:
+                rolling_transcript.append((time.time(), text))
+                cutoff = time.time() - TRANSCRIPT_BUFFER_SECONDS
+                while rolling_transcript and rolling_transcript[0][0] < cutoff:
+                    rolling_transcript.pop(0)
+                full_text = " ".join(t for _, t in rolling_transcript)
+
+            print(f"[heard] {text}")
+
+            lowered = text.lower()
+            for phrase in TRIGGER_PHRASES:
+                if phrase in lowered:
+                    print(f"🔥 Trigger detected: '{phrase}'")
+                    on_trigger_callback(full_text)
+                    break
+
+    t = threading.Thread(target=loop, daemon=True)
+    t.start()
+    return t
