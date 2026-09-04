@@ -1,0 +1,36 @@
+"""
+All the settings you might want to tweak live here.
+Nothing to code-edit elsewhere unless you're changing behavior.
+"""
+import os
+
+# --- Anthropic API ---
+# Set this as an environment variable named ANTHROPIC_API_KEY on your machine.
+# Windows (PowerShell):  setx ANTHROPIC_API_KEY "your-key-here"   (then restart terminal)
+# Mac/Linux:             export ANTHROPIC_API_KEY="your-key-here"
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+CLAUDE_MODEL = "claude-sonnet-4-6"
+
+# --- Hotkey trigger (always works, even if voice is off or mishears you) ---
+HOTKEY = "f9"  # press F9 anytime to force a visualization of the current slide
+
+# --- Voice trigger phrases ---
+# Say any of these while teaching and, if voice mode is on, it triggers a visualization.
+# Keep phrases short and distinct so they're easy for Whisper to catch clearly.
+TRIGGER_PHRASES = [
+    "visualize this",
+    "visualize this line",
+    "visualize along this",
+    "visualize whole page",
+    "visualize this page",
+    "visualize the whole page",
+]
+
+# --- Voice settings ---
+ENABLE_VOICE = True           # set to False to use ONLY the F9 hotkey (simpler, no mic needed)
+WHISPER_MODEL_SIZE = "base"   # tiny / base / small / medium / large-v2 -> bigger = more accurate, slower
+TRANSCRIPT_BUFFER_SECONDS = 45  # how much recent speech Claude gets as context when triggered
+
+# --- Overlay window ---
+OVERLAY_WIDTH = 520
+OVERLAY_HEIGHT = 650
