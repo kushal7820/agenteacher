@@ -1,0 +1,30 @@
+"""
+Handles taking a screenshot of your slide and finding where your mouse cursor is.
+"""
+import base64
+import io
+import mss
+from PIL import Image
+
+
+def capture_full_screen_base64():
+    """
+    Takes a screenshot of your primary monitor.
+    Returns (base64_encoded_string, media_type) ready to send to Claude's vision API.
+    """
+    with mss.mss() as sct:
+        monitor = sct.monitors[1]  # monitors[0] = all screens combined, [1] = primary screen
+        shot = sct.grab(monitor)
+        img = Image.frombytes("RGB", shot.size, shot.bgra, "raw", "BGRX")
+
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    b64_data = base64.standard_b64encode(buffer.getvalue()).decode("utf-8")
+    return b64_data, "image/png"
+
+
+def get_cursor_position():
+    """Returns (x, y) pixel position of your mouse - a rough stand-in for 'where you're pointing'."""
+    import pyautogui
+    pos = pyautogui.position()
+    return (pos.x, pos.y)
